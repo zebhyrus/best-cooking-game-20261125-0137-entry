@@ -44,6 +44,8 @@ export const RECIPES = [
   { name: 'Cheesy Melt', dish: 'Melt', color: '#f7c948', items: ['bun', 'cheese', 'tomato'] },
   { name: 'Garden Burger', dish: 'Garden Burger', color: '#7cb342', items: ['bun', 'patty', 'lettuce', 'tomato'] },
   { name: 'Double Stack', dish: 'Double Stack', color: '#8a4b2d', items: ['bun', 'patty', 'patty', 'tomato'] },
+  { name: 'Cheesy Garden', dish: 'Cheesy Garden', color: '#aed581', items: ['bun', 'cheese', 'lettuce', 'tomato'] },
+  { name: 'Double Cheese', dish: 'Double Cheese', color: '#ffb300', items: ['bun', 'patty', 'cheese', 'cheese'] },
 ];
 
 export function pickRecipe(random) {

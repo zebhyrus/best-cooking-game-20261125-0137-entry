@@ -2,7 +2,7 @@
 // shapes, so the game needs no image files. One draw() paints the HUD, the
 // order board, every station, the chef and the current screen overlay.
 import { VIEW_W, VIEW_H, STATIONS, INGREDIENTS, INGREDIENT_IDS, SHIFT_SECONDS, TARGET_SCORE, MAX_FAILS, stationCenter } from './data.js';
-import { CHEF_RADIUS } from './chef.js';
+import { CHEF_RADIUS, nearestStation } from './chef.js';
 
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -77,14 +77,18 @@ export function drawIngredientIcon(ctx, id, x, y, r, state) {
   ctx.restore();
 }
 
-function drawTicket(ctx, order, x, y, w, h) {
+function drawTicket(ctx, order, x, y, w, h, now) {
   const frac = Math.max(0, order.timeLeft / order.timeTotal);
   const urgent = order.timeLeft < 8;
+  // Urgent tickets pulse so a dying order is impossible to miss.
+  const pulse = urgent ? 0.75 + 0.25 * Math.sin(now * 6) : 1;
   ctx.save();
+  ctx.globalAlpha = pulse;
   ctx.fillStyle = urgent ? '#fff1f1' : '#fffdf5';
   ctx.strokeStyle = urgent ? '#e5484d' : '#c9a86a';
   ctx.lineWidth = urgent ? 3 : 2;
   rr(ctx, x, y, w, h, 10); ctx.fill(); ctx.stroke();
+  ctx.globalAlpha = 1;
   ctx.fillStyle = '#333';
   ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'left';
@@ -101,8 +105,8 @@ function drawTicket(ctx, order, x, y, w, h) {
   rr(ctx, x + 10, y + h - 12, w - 20, 7, 3); ctx.fill();
   ctx.fillStyle = urgent ? '#e5484d' : '#4caf50';
   rr(ctx, x + 10, y + h - 12, (w - 20) * frac, 7, 3); ctx.fill();
-  ctx.fillStyle = urgent ? '#e5484d' : '#555';
-  ctx.font = 'bold 14px sans-serif';
+  ctx.fillStyle = urgent ? '#e5484d' : '#333';
+  ctx.font = 'bold 16px sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText(`${Math.ceil(order.timeLeft)}s`, x + w - 10, y + 24);
   ctx.restore();
@@ -123,9 +127,9 @@ function drawChef(ctx, chef, now) {
   ctx.fillStyle = '#fff';
   ctx.beginPath(); ctx.arc(-8, -38, 11, 0, Math.PI * 2); ctx.arc(8, -38, 11, 0, Math.PI * 2); ctx.arc(0, -42, 12, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#333';
-  ctx.beginPath(); ctx.arc(-5, -20, 2, 0, Math.PI * 2); ctx.arc(5, -20, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-5 + chef.dir * 3, -20, 2, 0, Math.PI * 2); ctx.arc(5 + chef.dir * 3, -20, 2, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(0, -15, 5, 0.2, Math.PI - 0.2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(chef.dir * 3, -15, 5, 0.2, Math.PI - 0.2); ctx.stroke();
   ctx.restore();
   if (chef.hands) {
     ctx.save();
@@ -149,6 +153,9 @@ function drawChef(ctx, chef, now) {
 function drawStation(ctx, station, game, now) {
   const { kitchen } = game;
   ctx.save();
+  // Soft drop shadow so counters sit on the floor instead of floating on it.
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  rr(ctx, station.x + 3, station.y + 6, station.w, station.h, 12); ctx.fill();
   ctx.fillStyle = '#8d6e63';
   rr(ctx, station.x, station.y, station.w, station.h, 12); ctx.fill();
   ctx.fillStyle = '#a1887f';
@@ -186,6 +193,24 @@ function drawStation(ctx, station, game, now) {
       ctx.beginPath(); ctx.arc(bx, by, 36, 0, Math.PI * 2); ctx.stroke();
       const burner = kitchen.burners[i];
       if (burner) {
+        // Flickering flame ring while a patty cooks, and rising steam once
+        // it is done or cooking — the stove reads as hot at a glance.
+        if (burner.state === 'cooking') {
+          const flick = 0.75 + 0.25 * Math.sin(now * 9 + i * 2.4);
+          ctx.fillStyle = `rgba(255,${Math.round(120 + 60 * flick)},0,${0.5 * flick})`;
+          ctx.beginPath(); ctx.arc(bx, by, 50 * flick, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,213,79,0.55)';
+          ctx.beginPath(); ctx.arc(bx, by, 40 * flick, 0, Math.PI * 2); ctx.fill();
+        }
+        if (burner.state !== 'burnt') {
+          for (let s = 0; s < 3; s += 1) {
+            const phase = ((now * 0.45 + s / 3 + i * 0.31) % 1);
+            const sx = bx + Math.sin(now * 2 + s * 2.1 + i) * 8 * phase;
+            const sy = by - 18 - phase * 46;
+            ctx.fillStyle = `rgba(255,255,255,${0.35 * (1 - phase)})`;
+            ctx.beginPath(); ctx.arc(sx, sy, 5 + phase * 9, 0, Math.PI * 2); ctx.fill();
+          }
+        }
         drawIngredientIcon(ctx, burner.id, bx, by, 22, burner.state === 'burnt' ? 'burnt' : burner.state);
         const frac = burner.state === 'cooking' ? burner.progress : burner.state === 'done' ? 1 - burner.doneIn / 4 : 1;
         ctx.strokeStyle = burner.state === 'burnt' ? '#e5484d' : burner.state === 'done' ? '#4caf50' : '#ff9800';
@@ -258,15 +283,26 @@ export function drawGame(ctx, game, screen, now) {
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 24px sans-serif';
   ctx.fillText(`SCORE ${score}`, 320, 42);
+  // Score progress toward the target — the win condition is always visible.
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillRect(320, 50, 140, 6);
+  ctx.fillStyle = '#ffd54f';
+  ctx.fillRect(320, 50, 140 * Math.min(1, score / TARGET_SCORE), 6);
   ctx.fillStyle = '#ffd54f';
   ctx.font = 'bold 18px sans-serif';
   ctx.fillText(`TARGET ${TARGET_SCORE}`, 480, 40);
   ctx.fillStyle = board.combo > 1 ? '#ff7043' : '#fff';
   ctx.font = 'bold 20px sans-serif';
   ctx.fillText(board.combo > 1 ? `COMBO x${board.combo}` : 'COMBO x1', 640, 42);
+  if (board.combo > 1 && board.comboLeft > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(640, 50, 90, 6);
+    ctx.fillStyle = '#ff7043';
+    ctx.fillRect(640, 50, 90 * Math.max(0, board.comboLeft / 12), 6);
+  }
   const shiftLeft = Math.max(0, game.shiftLeft);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'right';
-  ctx.fillText(`⏱ ${Math.floor(shiftLeft / 60)}:${String(Math.floor(shiftLeft % 60)).padStart(2, '0')}`, 1010, 42);
+  ctx.fillStyle = shiftLeft < 30 ? '#ff8a80' : '#fff'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'right';
+  ctx.fillText(`TIME ${Math.floor(shiftLeft / 60)}:${String(Math.floor(shiftLeft % 60)).padStart(2, '0')}`, 1010, 42);
   ctx.fillStyle = '#e5484d';
   ctx.font = 'bold 20px sans-serif';
   ctx.fillText(`✖ ${'●'.repeat(MAX_FAILS - game.fails)}${'○'.repeat(game.fails)}`, 1180, 42);
@@ -287,10 +323,32 @@ export function drawGame(ctx, game, screen, now) {
     ctx.fillText('No orders yet — grab ingredients and get ready...', 30, 150);
   }
   board.orders.forEach((order, i) => {
-    drawTicket(ctx, order, 30 + i * 300, 106, 280, 66);
+    drawTicket(ctx, order, 30 + i * 300, 106, 280, 66, now);
   });
-  // Stations, then chef on top.
+  // Stations, then chef on top. The station the chef can use right now gets
+  // a golden glow and an E key badge, so the controls teach themselves.
   for (const station of STATIONS) drawStation(ctx, station, game, now);
+  if (screen === 'play') {
+    const near = nearestStation(chef, STATIONS);
+    if (near) {
+      ctx.save();
+      ctx.strokeStyle = '#ffd54f';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#ffd54f';
+      ctx.shadowBlur = 14;
+      rr(ctx, near.x - 3, near.y - 3, near.w + 6, near.h + 6, 14); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // The E key floats above the chef, never colliding with a station label.
+      const bx = chef.x;
+      const by = chef.y - 84;
+      ctx.fillStyle = '#ffd54f';
+      ctx.beginPath(); ctx.arc(bx, by, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#3e2723'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('E', bx, by + 6);
+      ctx.restore();
+    }
+  }
   drawChef(ctx, chef, now);
   // Flash + serve popup
   if (kitchen.flash && now - kitchen.flashAt < 2.5) {
@@ -303,9 +361,20 @@ export function drawGame(ctx, game, screen, now) {
     ctx.textAlign = 'left';
   }
   if (game.lastServe && now - game.lastServe.at < 2) {
-    ctx.fillStyle = '#4caf50';
+    const age = now - game.lastServe.at;
+    const pop = age < 0.25 ? 1 + 0.35 * (1 - age / 0.25) : 1;
+    ctx.save();
+    ctx.translate(VIEW_W / 2, 470);
+    ctx.scale(pop, pop);
+    // Dark pill behind the popup so it reads over any station.
     ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(`+${game.lastServe.points}  ${game.lastServe.name} served!  COMBO x${game.lastServe.combo}`, VIEW_W / 2, 470);
+    const msg = `+${game.lastServe.points}  ${game.lastServe.name} served!  COMBO x${game.lastServe.combo}`;
+    const mw = ctx.measureText(msg).width + 44;
+    ctx.fillStyle = 'rgba(20,12,8,0.78)';
+    rr(ctx, -mw / 2, -34, mw, 46, 23); ctx.fill();
+    ctx.fillStyle = '#8dff6e';
+    ctx.fillText(msg, 0, 0);
+    ctx.restore();
     ctx.textAlign = 'left';
   }
   // Controls hint lives in the page HTML below the canvas, not drawn here,

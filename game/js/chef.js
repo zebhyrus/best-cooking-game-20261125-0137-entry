@@ -1,6 +1,6 @@
 // Sizzle Rush chef: movement, the carry slot, and the click-to-move target.
 // The chef carries at most one thing: one ingredient, or one finished plate.
-import { VIEW_W, VIEW_H, stationCenter } from './data.js';
+import { VIEW_W, VIEW_H } from './data.js';
 
 export const CHEF_SPEED = 340;
 export const CHEF_RADIUS = 26;
@@ -55,6 +55,11 @@ export function updateChef(chef, keys, dt) {
     mx /= len;
     my /= len;
   } else if (chef.target) {
+    // Clamp the target into the walkable floor first: a click on the order
+    // board or the HUD used to leave an unreachable target the chef chased
+    // forever against the top edge. Now the target is always reachable.
+    chef.target.x = Math.min(VIEW_W - 30, Math.max(30, chef.target.x));
+    chef.target.y = Math.min(VIEW_H - 24, Math.max(196, chef.target.y));
     const dx = chef.target.x - chef.x;
     const dy = chef.target.y - chef.y;
     const dist = Math.hypot(dx, dy);
@@ -73,14 +78,18 @@ export function updateChef(chef, keys, dt) {
   if (chef.moving) chef.walkPhase += dt * 11;
 }
 
-// The station the chef is close enough to use, or null. Crates and the trash
-// are used from the side; the counters from in front.
+// The station the chef is close enough to use, or null. Distance is measured
+// to the station's rectangle, not its centre: the wide counters (plating,
+// hatch, stove) are usable from anywhere along their edge, not only from
+// the middle. Crates and the trash are used from the side; counters from in
+// front.
 export function nearestStation(chef, stations) {
   let best = null;
-  let bestDist = 110;
+  let bestDist = 105;
   for (const station of stations) {
-    const c = stationCenter(station);
-    const d = Math.hypot(chef.x - c.x, chef.y - c.y);
+    const dx = Math.max(station.x - chef.x, 0, chef.x - (station.x + station.w));
+    const dy = Math.max(station.y - chef.y, 0, chef.y - (station.y + station.h));
+    const d = Math.hypot(dx, dy);
     if (d < bestDist) { bestDist = d; best = station; }
   }
   return best;

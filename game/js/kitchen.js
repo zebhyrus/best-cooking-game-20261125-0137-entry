@@ -63,7 +63,9 @@ export function tryInteract(game, now) {
 
   if (station.kind === 'crate') {
     if (!chefHandsEmpty(chef)) { setFlash(kitchen, 'Hands full! Serve or trash it first.', now); return 'none'; }
-    if (kitchen.board) { setFlash(kitchen, 'Finish chopping first!', now); return 'none'; }
+    // Chopping runs on its own on the board, so grabbing the next ingredient
+    // while it finishes is fine — the old version blocked this and stalled
+    // every multi-step dish.
     takeItem(chef, station.id, 'raw');
     if (audio) audio.pickup();
     return 'pickup';
@@ -118,7 +120,7 @@ export function tryInteract(game, now) {
       }
       kitchen.plate.push(id);
       dropHands(chef);
-      if (audio) audio.place();
+      if (audio) audio.pop();
       return 'plated';
     }
     if (chefHandsEmpty(chef) && kitchen.plate.length > 0) {
@@ -127,6 +129,7 @@ export function tryInteract(game, now) {
       if (audio) audio.pickup();
       return 'pickup-plate';
     }
+    if (chefHasPlate(chef)) { setFlash(kitchen, 'Carry the plate to the SERVE hatch!', now); return 'none'; }
     setFlash(kitchen, 'Bring a ready ingredient to the plate.', now);
     return 'none';
   }
@@ -167,7 +170,7 @@ export function tryServe(game, now) {
   dropHands(chef);
   game.score += result.points;
   game.lastServe = { points: result.points, combo: result.combo, name: result.order.recipe.name, at: now };
-  if (audio) audio.ding();
+  if (audio) audio.serve();
   return true;
 }
 

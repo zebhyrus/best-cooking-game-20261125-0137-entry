@@ -9,6 +9,21 @@ a burn window, plating, serving, combo scoring, escalating difficulty, and
 win / game-over screens. All art is drawn in code (canvas shapes), all sound
 is synthesized with WebAudio. No copied names, characters, art or music.
 
+## v2 (2026-11-25, play-tested + polished)
+
+- Real CDP play-through in headless Chrome (keyboard, mouse, full shift):
+  fixed the click-to-move trap (a click above the floor left an unreachable
+  target the chef chased forever) and the centre-only station reach (wide
+  counters were usable only from their middle — reach is now measured to the
+  station rectangle, so the plating counter, hatch and stove work from any
+  edge). Grabbing ingredients while something chops is allowed now.
+- Seven recipes (added Cheesy Garden, Double Cheese); the station the chef
+  can use glows gold with a floating E badge; stove shows flickering flames
+  and rising steam; urgent tickets pulse; serve popups pop-scale on a dark
+  pill; HUD shows score progress toward 600 and the combo timer; the timer
+  reads TIME 2:12 in plain text. Space also works as the interact key.
+- Sounds: distinct pop (plating) and serve jingle, chop pitch varies.
+
 ## How it was built
 
 Static files under `game/` (index.html + CSS + ES modules, no build step, no
@@ -29,9 +44,9 @@ network requests). The source is split by job:
 ## Controls
 
 - Move: WASD / arrow keys, or click a spot on the floor (click-to-move)
-- E (or click near the chef): use the nearest station — take an ingredient,
+- E or Space (or click near the chef): use the nearest station — take an ingredient,
   start chopping, place / pick up a patty, add to the plate, pick up the plate,
-  serve at the hatch, trash a burnt item
+  serve at the hatch, trash a burnt item. The usable station glows gold.
 - P: pause, M: mute, Enter: start / restart
 
 ## Flow

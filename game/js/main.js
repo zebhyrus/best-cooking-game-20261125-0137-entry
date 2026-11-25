@@ -1,10 +1,10 @@
 // Sizzle Rush main: boot, the fixed-step loop, keyboard and mouse input, the
 // title / play / paused / win / game-over screens, and the ?shot= screenshot
 // mode that stages one frame and reports window.__shotReady.
-import { VIEW_W, VIEW_H, SHIFT_SECONDS, TARGET_SCORE, MAX_FAILS } from './data.js';
+import { VIEW_W, VIEW_H, SHIFT_SECONDS, TARGET_SCORE, MAX_FAILS, STATIONS } from './data.js';
 import { createAudio } from './audio.js';
 import { createOrderBoard, updateOrders, resetOrderIds } from './orders.js';
-import { createChef, updateChef } from './chef.js';
+import { createChef, updateChef, nearestStation } from './chef.js';
 import { createKitchen, updateKitchen, tryInteract, finishChop } from './kitchen.js';
 import { drawGame } from './render.js';
 import { stageShot } from './shots.js';
@@ -68,6 +68,10 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     if (screen === 'title' || screen === 'win' || screen === 'over') resetGame();
     else if (screen === 'paused') setScreen('play');
+    else if (screen === 'play' && event.code === 'Space') {
+      const result = tryInteract(game, game.elapsed);
+      if (result === 'served') checkEnd();
+    }
     return;
   }
   if (event.code === 'KeyE') {
@@ -169,6 +173,7 @@ window.__sizzle = {
   start() { resetGame(); },
   interact() { return tryInteract(game, game.elapsed); },
   step(dt) { step(dt); },
+  nearest() { const s = nearestStation(game.chef, STATIONS); return s ? s.kind + ':' + (s.id || s.label) : null; },
 };
 
 if (shotName) {

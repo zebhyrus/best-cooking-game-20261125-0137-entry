@@ -47,8 +47,8 @@ export function stageShot(name, game) {
   if (name === 'assembly') {
     game.chef.x = 470;
     game.chef.y = 520;
-    takeItem(game.chef, 'tomato', 'chopped');
-    game.kitchen.plate = ['bun', 'patty', 'cheese'];
+    takeItem(game.chef, 'cheese', 'raw');
+    game.kitchen.plate = ['bun', 'patty'];
     game.kitchen.burners = [{ id: 'patty', progress: 1, state: 'done', doneIn: 1 }, null];
     spawnOrder(game.board, 2, now);
     spawnOrder(game.board, 2, now);
@@ -60,7 +60,7 @@ export function stageShot(name, game) {
     game.score = 260;
     game.board.combo = 2;
     game.board.comboLeft = 8;
-    game.kitchen.flash = 'Add the chopped tomato to finish the Burger!';
+    game.kitchen.flash = 'Add the cheese to finish the Classic Burger!';
     game.kitchen.flashAt = 0;
     return 'play';
   }
@@ -82,9 +82,9 @@ export function stageShot(name, game) {
     game.shiftLeft = 58;
     return 'play';
   }
-  // kitchen (cover): a busy mid-shift kitchen.
-  game.chef.x = 640;
-  game.chef.y = 450;
+  // kitchen (cover): a busy mid-shift kitchen, chef at the stove with a patty.
+  game.chef.x = 710;
+  game.chef.y = 360;
   takeItem(game.chef, 'patty', 'raw');
   game.kitchen.board = { id: 'tomato', progress: 0.4, done: false };
   game.kitchen.burners = [
